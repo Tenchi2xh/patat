@@ -63,8 +63,9 @@ displayWithBorders Presentation {..} f = do
         borders     = themed (themeBorders theme)
 
     unless (null title) $ do
-        Ansi.setCursorColumn titleOffset
-        PP.putDoc $ borders $ PP.string title
+        let titleRemainder = columns - titleWidth - titleOffset
+            wrappedTitle = PP.spaces titleOffset <> PP.string title <> PP.spaces titleRemainder
+        PP.putDoc $ borders wrappedTitle
         putStrLn ""
         putStrLn ""
 
@@ -72,14 +73,15 @@ displayWithBorders Presentation {..} f = do
     PP.putDoc $ withWrapSettings settings $ f canvasSize theme margin
     putStrLn ""
 
-    let (sidx, _)   = pActiveFragment
-        active      = show (sidx + 1) ++ " / " ++ show (length pSlides)
-        activeWidth = length active
+    let (sidx, _)    = pActiveFragment
+        active       = show (sidx + 1) ++ " / " ++ show (length pSlides)
+        activeWidth  = length active
+        author       = PP.toString (prettyInlines theme pAuthor)
+        authorWidth  = length author
+        middleSpaces = PP.spaces $ columns - activeWidth - authorWidth - 2
 
     Ansi.setCursorPosition (rows - 1) 0
-    PP.putDoc $ " " <> borders (prettyInlines theme pAuthor)
-    Ansi.setCursorColumn (columns - activeWidth - 1)
-    PP.putDoc $ borders $ PP.string active
+    PP.putDoc $ borders $ PP.space <> PP.string author <> middleSpaces <> PP.string active <> PP.space
     IO.hFlush IO.stdout
 
 
@@ -94,7 +96,7 @@ displayPresentation pres@Presentation {..} = displayWithBorders pres $
                 (prows, pcols) = PP.dimensions pblock
                 offsetRow      = (csRows canvasSize `div` 2) - (prows `div` 2)
                 offsetCol      = (csCols canvasSize `div` 2) - (pcols `div` 2)
-                spaces         = mconcat (replicate offsetCol PP.space) in
+                spaces         = PP.spaces offsetCol in
             mconcat (replicate (offsetRow - 3) PP.hardline) <$$>
             PP.indent (PP.NotTrimmable spaces) (PP.NotTrimmable spaces) pblock
 
@@ -248,7 +250,7 @@ prettyBlocks theme = PP.vcat . map (prettyBlock theme) . filter isVisibleBlock
 prettyBlocks' :: Theme -> Int -> [Pandoc.Block] -> PP.Doc
 prettyBlocks' theme margin =
     let
-        spaces = mconcat (replicate margin PP.space)
+        spaces = PP.spaces margin
         indent = PP.indent (PP.NotTrimmable spaces) (PP.NotTrimmable spaces) in
     PP.vcat . map indent . map (prettyBlock theme) . filter isVisibleBlock
 
